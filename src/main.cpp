@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include "../lib/ArduinoJson-6.x/ArduinoJson.h"
 #include "../lib/pubsubclient/PubSubClient.h"
 #include "../lib/dht/DHT.h"
 
@@ -102,14 +103,22 @@ void read_dht_sensor_values() {
         log("Failed to read from DHT sensor!");
         return;
     }
-    log("Humidity: ", String(humidity), "%");
-    log("Temperature: ", String(temperatureCelsius), "°C");
-    pubSubClient.publish("outTopic", ("Temperature: " + String(temperatureCelsius)).begin());
+
+    DynamicJsonDocument doc(1024);
+    doc["sensor"] = "dht";
+    doc["temperature"] = temperatureCelsius;
+    doc["humidity"] = humidity;
+
+    String measurements;
+    serializeJson(doc, measurements);
+    log("Measurements: ", measurements);
+    pubSubClient.publish("outTopic", measurements.begin());
 }
 
 
 void loop() {
     delay(2000);
+    // TODO: add WiFi connection test and reconnection function
     if (!pubSubClient.connected()) {
         mqtt_reconnect();
     }
