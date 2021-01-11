@@ -24,32 +24,38 @@ WiFiClient wifiClient;
 PubSubClient pubSubClient(wifiClient);
 
 
+// TODO check F() function: log("[Setup]"); vs log(F("[Setup]"));
+void log(String value) {
+    Serial.println(value);
+}
+
+void log(String value, String endValue) {
+    Serial.print(value);
+    log(endValue);
+}
+
+void log(String value1, String value2, String endValue) {
+    Serial.print(value1);
+    log(value2, endValue);
+}
+
 void mqtt_callback(char *topic, byte *payload, unsigned int length) {
-    Serial.print("Message arrived [");
-    Serial.print(topic);
-    Serial.print("] ");
+    log("Message arrived [", topic, "] ");
+    String buffer = "";
     for (int i = 0; i < length; i++) {
-        Serial.print((char) payload[i]);
+        buffer += (char) payload[i];
     }
-    Serial.println();
+    log("> payload: ", buffer);
 }
 
 void mqtt_reconnect() {
-    // Loop until we're reconnected
     while (!pubSubClient.connected()) {
-        Serial.print("Attempting MQTT connection...");
-        // Attempt to connect
+        log("Attempting MQTT connection");
         if (pubSubClient.connect("arduinoClient")) {
-            Serial.println("connected");
-            // Once connected, publish an announcement...
-            pubSubClient.publish("outTopic", "hello world");
-            // ... and resubscribe
+            log("MQTT connected");
             pubSubClient.subscribe("inTopic");
         } else {
-            Serial.print("failed, rc=");
-            Serial.print(pubSubClient.state());
-            Serial.println(" try again in 5 seconds");
-            // Wait 5 seconds before retrying
+            log("MQTT failed, rc=", String(pubSubClient.state()), " try again in 5 seconds");
             delay(5000);
         }
     }
@@ -57,26 +63,23 @@ void mqtt_reconnect() {
 
 
 void setup_wifi() {
-    Serial.println("[Setup Wifi]");
-    Serial.print("Connecting to: ");
-    Serial.println(ssid);
+    log("[Setup Wifi]");
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
-        Serial.print(".");
+        log("> connecting to: ", ssid);
     }
-    Serial.println("WiFi connected");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
+    log("WiFi connected");
+    log("IP address: ", WiFi.localIP().toString());
 }
 
 void setup_dht_sensor() {
-    Serial.println("[Setup DHT sensor]");
+    log("[Setup DHT sensor]");
     dht.begin();
 }
 
 void setup_mqtt_client() {
-    Serial.println("[Setup MQTT pubSubClient]");
+    log("[Setup MQTT pubSubClient]");
     pubSubClient.setServer(mqtt_server, 1883);
     pubSubClient.setCallback(mqtt_callback);
 }
@@ -93,20 +96,15 @@ void read_dht_sensor_values() {
     float humidity = dht.readHumidity();
     float temperatureCelsius = dht.readTemperature();
     float temperatureFahrenheit = dht.readTemperature(true);
-
-    // Check if any reads failed and exit early (to try again).
+//    dht.computeHeatIndex(temperatureCelsius, humidity, false);
+//    dht.computeHeatIndex(temperatureFahrenheit, humidity);
     if (isnan(humidity) || isnan(temperatureCelsius) || isnan(temperatureFahrenheit)) {
-        Serial.println(F("Failed to read from DHT sensor!"));
+        log("Failed to read from DHT sensor!");
         return;
     }
-
-    Serial.printf("Humidity: %f %%, Temperature: %f °C %f °F\n", humidity, temperatureCelsius, temperatureFahrenheit);
-
+    log("Humidity: ", String(humidity), "%");
+    log("Temperature: ", String(temperatureCelsius), "°C");
     pubSubClient.publish("outTopic", ("Temperature: " + String(temperatureCelsius)).begin());
-
-    float heatIndexCelsius = dht.computeHeatIndex(temperatureCelsius, humidity, false);
-    float heatIndexFahrenheit = dht.computeHeatIndex(temperatureFahrenheit, humidity);
-    Serial.printf("Heat index: %f °C %f °F\n", heatIndexCelsius, heatIndexFahrenheit);
 }
 
 
